@@ -139,6 +139,7 @@ new_dados%>%
   theme_bw()
 ```
 ```{r}
+#MT é o único estado que o custo de km rodado com etanol é mais barato do que com gasolina.
 #como verificamos acima, a região sudeste tem o menor preço médio para Etanol, Gasolina e Gasolina Adtivada. Levando em consideração o consumo de um carro popular, foi possível verificar que em SP o mais aconselhavel é abastecer com gasolina, desta forma analisamos o preço médio praticado por cada bandeira dentro do estado
 
 b_est<-group_by(dados,Bandeira)%>%filter(Produto=="GASOLINA",Estado=="SP")%>%summarise(Total=mean(Valor))%>%arrange(Total)%>%ungroup()
