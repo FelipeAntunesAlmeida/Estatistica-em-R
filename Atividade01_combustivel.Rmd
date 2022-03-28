@@ -1,0 +1,162 @@
+---
+title: "ATV_01"
+output: html_document
+date: '2022-03-26'
+---
+
+```{r}
+if(!require(qqplotr))
+  install.packages("qqplotr")
+library(qqplotr)
+
+if(!require(car))
+  install.packages("car")
+library(car)
+
+if(!require(tidyr))
+  install.packages("tidyr")
+library(tidyr)
+
+if(!require(ggpubr))
+  install.packages("ggpubr")
+library(ggpubr)
+
+if(!require(readr))
+  install.packages("readr")
+library(readr)
+
+if(!require(dplyr))
+  install.packages("dplyr")
+library(dplyr)
+```
+```{r}
+
+df <- read.csv2('~/IA/Aula_IA/Atividade01/combustiveis.csv')
+```
+```{r}
+df
+View(df)
+```
+```{r}
+dados <- df %>% 
+  select(Regiao = 'ï..Regiao...Sigla',
+         Estado = 'Estado...Sigla',
+         Produto,
+         Valor = 'Valor.de.Venda',
+         Bandeira
+         )
+View(dados)
+```
+
+
+```{r}
+
+dados %>%
+  ggplot(aes(sample = Valor))+
+  facet_wrap(~Produto)+
+  stat_qq_band(fill = "gray")+
+  stat_qq_line(col = "red")+
+  stat_qq_point()
+
+```
+```{r}
+dados%>%
+  ggplot(aes(Valor))+
+  geom_histogram(aes(y = stat(count) / sum(count)), bins = 10)+
+  geom_density()+
+  facet_wrap(~Produto)+
+  scale_y_continuous(labels = scales::percent)
+```
+```{r}
+#devido ao tamanho da amostra não foi possível aplicar os testes de normalidade, por esse motivo não foram usados Shapiro e Kolmogorov, somente os gráficos. Também foi utilizado o Anderson-Darling normality test
+table(dados$Produto)
+```
+```{r}
+if(!require(nortest))
+  install.packages("nortest") 
+library(nortest)
+
+dados%>%ggplot(aes(dados$Valor, bins = 20))+
+  geom_histogram()
+  
+ad.test(dados$Valor)
+
+teste_1<-group_by(dados)%>%filter(Produto=="DIESEL")
+teste_2<-group_by(dados)%>%filter(Produto=="DIESEL S10")
+teste_3<-group_by(dados)%>%filter(Produto=="ETANOL")
+teste_4<-group_by(dados)%>%filter(Produto=="GASOLINA")
+teste_5<-group_by(dados)%>%filter(Produto=="GASOLINA ADITIVADA")
+teste_6<-group_by(dados)%>%filter(Produto=="GNV")
+
+ad.test(teste_1$Valor)                      
+ad.test(teste_2$Valor)
+ad.test(teste_3$Valor)
+ad.test(teste_4$Valor)
+ad.test(teste_5$Valor)
+ad.test(teste_6$Valor)
+```
+```{r}
+M_est<-group_by(dados,Produto,Estado,Regiao)%>%summarise(Total=mean(Valor))%>%arrange(Produto,Total)%>%ungroup()
+
+M_reg<-group_by(dados,Produto,Regiao)%>%summarise(Total=mean(Valor))%>%arrange(Produto,Total)%>%ungroup()
+
+View(M_est)
+View(M_reg)
+```
+
+
+```{r}
+
+M_reg %>%
+  ggplot(aes(Regiao,Total, color=Regiao))+
+  facet_wrap(~Produto)+
+  labs(y="Valor", title = "Preço médio do combustivel por região do país")+
+  geom_point()
+```
+```{r}
+gas<-group_by(M_est,Produto,Regiao,Total)%>%filter(Produto=="GASOLINA")%>%mutate(Preco_km=Total/12,8)%>%ungroup()
+gas_adt<-group_by(M_est,Produto,Regiao,Total)%>%filter(Produto=="GASOLINA ADITIVADA")%>%mutate(Preco_km=Total/12,8)%>%ungroup()
+eta<-group_by(M_est,Produto,Regiao,Total)%>%filter(Produto=="ETANOL")%>%mutate(Preco_km=Total/9,1)%>%ungroup()
+
+gas$`8`<-NULL
+gas_adt$`8`<-NULL
+eta$`1`<-NULL
+
+
+
+new_dados <- bind_rows(gas, gas_adt, eta)
+
+View(new_dados)
+
+#consumo HB20 1.0 cidade A 9,1    G 12,8, carro mais vendido em 2021
+#relação entre preço do combustivel e consumo
+
+
+new_dados%>%
+  ggplot(aes(Estado,Preco_km, color=Produto))+
+  labs(y="Preço por KM",title = "Custo do KM por combustivel")+
+  geom_point()+
+  theme_bw()
+```
+```{r}
+#como verificamos acima, a região sudeste tem o menor preço médio para Etanol, Gasolina e Gasolina Adtivada. Levando em consideração o consumo de um carro popular, foi possível verificar que em SP o mais aconselhavel é abastecer com gasolina, desta forma analisamos o preço médio praticado por cada bandeira dentro do estado
+
+b_est<-group_by(dados,Bandeira)%>%filter(Produto=="GASOLINA",Estado=="SP")%>%summarise(Total=mean(Valor))%>%arrange(Total)%>%ungroup()
+
+b_est%>%
+  ggplot(aes(Bandeira,Total))+
+  labs(y="Preço",title = "Preço da Gasolina no Estado de SP por bandeira")+
+  theme(axis.text.x = element_text(angle = 90, vjust = .5))+
+  geom_point()
+  
+
+```
+```{r}
+dados%>%
+  ggplot(aes(Estado))+
+  theme_bw()+
+  labs(title = "Quantidade de amostras por estado")+
+  geom_bar()
+```
+
+
