@@ -1,0 +1,197 @@
+---
+title: "Atividade 2"
+author: "Felipe Antunes de Almeida"
+date: '2022-04-02'
+output: html_document
+---
+
+```{r}
+if (!require(pacman))
+  install.packages("pacman")
+library(pacman)
+if (!require(psych))
+  install.packages("psych")
+library(psych)
+if (!require(DescTools))
+  install.packages("DescTools")
+library(DescTools)
+library(ggplot2)
+library(qqplotr)
+library(RVAideMemoire)
+pacman::p_load(dplyr, car, rstatix, lmtest, ggpubr,
+               psych, MASS)
+```
+Temos 32 carros e 11 variaveis categoricas
+```{r}
+dados<- mtcars
+
+View(dados)
+glimpse(dados)
+```
+```{r}
+#tabelas de frequencia relativa de dados categoricos
+table(dados$cyl)
+prop.table(table(dados$am, dados$cyl))*100
+prop.table(table(dados$vs, dados$cyl))*100
+prop.table(table(dados$vs, dados$am))*100
+prop.table(table(dados$vs, dados$cyl, dados$am))*100
+
+```
+
+As variaveis **vs** e **am** vamos transformar em factor e modificar seu conteudo
+```{r}
+dados$vs<-factor(dados$vs, label = c("V","Linha"), levels = c(0,1))
+dados$am<-factor(dados$am, label = c("Aut","Manual"), levels = c(0,1))
+```
+As variaveis cyl, gear e carb em fator
+
+```{r}
+dados$cyl <- factor(dados$cyl)
+dados$gear <- factor(dados$gear)
+dados$carb <- factor(dados$carb)
+
+summary(dados$mpg)
+```
+```{r}
+dados %>% 
+  ggplot(aes(sample = mpg))+
+  facet_wrap(~cyl)+
+  stat_qq_band(fill = "gray")+
+  stat_qq_line(col = "red")+
+  stat_qq_point()
+```
+
+```{r}
+#normalidade dos dados por cilindros
+byf.shapiro(mpg~cyl,dados)
+#dividindo os grupos
+c_4<-group_by(dados)%>%filter(cyl == "4")
+c_6<-group_by(dados)%>%filter(cyl == "6")
+c_8<-group_by(dados)%>%filter(cyl == "8")
+
+summary(c_4$mpg)
+t.test(c_4$mpg, mu= 20.09)
+
+summary(c_6$mpg)
+t.test(c_6$mpg, mu= 20.09)
+
+summary(c_8$mpg)
+t.test(c_8$mpg, mu= 20.09)
+#erro padrao
+dp_4<-sd(c_4$mpg)
+dp_6<-sd(c_6$mpg)
+dp_8<-sd(c_8$mpg)
+#verificar o min e max
+range(c_4$mpg)
+range(c_6$mpg)
+range(c_8$mpg)
+#verificar a quantidade de grupos para separa-los
+nclass.Sturges(c_4$mpg)
+nclass.Sturges(c_6$mpg)
+nclass.Sturges(c_8$mpg)
+
+table(cut(c_4$mpg, seq(21,34,l=5)))
+table(cut(c_6$mpg, seq(17,22,l=4)))
+table(cut(c_8$mpg, seq(10,20,l=6)))
+
+#media, desvio padrao, erro, mediana... por cilindro e cambio
+describe(c_4$mpg)
+describeBy(c_6$mpg, group = c_6$am)
+describeBy(c_8$mpg, group = c_8$am)
+
+#media de consumo e erro padrao por quantidade de cilindros e cambio
+tabela<-dados%>%group_by(cyl,am)%>%summarise(media=mean(mpg),dp=sd(mpg))
+
+tabela
+```
+O teste T para uma amostra aplicado nos grupos separados por cilindros, foi realizado comparando com a média de todas as amostras, sendo assim verificamos que nenhum dos grupos corresponde ao valor médio do consumo geral, nos graficos abaixo podemos ver que é nitido que quanto maior a quantidade de cilindros maior é a potencia e menor a autonomia.
+Sendo assim acredito que o melhor é trabalharmos com os grupos divididos pela quantidade de cilindros para que possamos obter os melhores resultados. 
+
+```{r}
+trans_eco <- ggplot(data = dados, aes(x=cyl, y=mpg), draw_quantiles=TRUE)+
+  theme_bw()+
+  geom_boxplot(fill = "gray")+
+  labs(title="Consumo de acordo com cilindros",  x="Cilindros",y="Milhas por galão")
+trans_eco
+```
+ 
+```{r}
+ggplot(dados, aes(x = hp, y = mpg, color = cyl))+
+  geom_point()+
+  geom_smooth()+
+  theme_bw()+
+  labs(title="Consumo de acordo com o tipo de motor",  x="Potencia (HP)",y="Milhas por galão")
+  
+```
+```{r}
+t.test(mpg~am, data=c_4)
+
+t.test(mpg~am, data=c_6)
+
+t.test(mpg~am, data=c_8)
+```
+Aplicando o `t.test` comparando o consumo de acordo com tipo de transmissao, podemos dizer que:
+devido `p-value = 0.01802` tão baixo, motores 4 cilindros tem diferença no consumo se compararmos o tipo de transmissão
+já para os motores de 6 e 8 cilindros não há uma diferença significativa no consumo de acordo com o tipo de transmissao
+
+```{r}
+leveneTest(mpg~cyl,dados, center=mean) #Variancias não são homogeneas p<0,05
+
+#variancias homogeneas p>0,05
+leveneTest(mpg~am,c_4, center=mean) 
+leveneTest(mpg~am,c_6, center=mean)
+leveneTest(mpg~am,c_8, center=mean)
+
+dados%>%anova_test(mpg~am)
+
+dados%>%tukey_hsd(mpg~am)
+```
+```{r}
+#identificando outliers
+boxplot(mpg~cyl, data=dados)
+
+dados%>%
+  group_by(cyl)%>%
+  identify_outliers(mpg)
+```
+
+
+Regressao linear simples
+```{r}
+modelo<-lm(mpg~qsec, data=dados)
+summary(modelo)
+
+plot(modelo)
+
+
+#normalidade dos resíduos
+
+shapiro_test(modelo$residuals)
+
+#outliers
+summary(rstandard(modelo))
+
+
+#independência dos resíduos (durbin-watson )
+durbinWatsonTest(modelo)
+
+#homocedasticidade (Breush-Pegan)
+
+bptest(modelo)
+
+#remover os outliers
+dados <- dados[!row.names(dados) %in% c("Lotus Europa","Toyota Corolla", "Fiat 128"),]
+
+summary(modelo)
+```
+
+```{r}
+dados %>%
+  ggplot(aes(x =  mpg, y = qsec))+
+  geom_point()+
+  geom_smooth(method = 'lm', col = 'red')+
+  stat_regline_equation(aes(label  = paste( ..eq.label.., ..adj.rr.label.., sep = '*plain(\",\")~~')),
+                        label.x = 2, label.y =1)+
+  theme_classic()
+```
+
